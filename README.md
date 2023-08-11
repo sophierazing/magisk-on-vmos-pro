@@ -4,10 +4,6 @@
 在不修改boot或recovery的情况下，通过修改/system实现root
 感谢Magisk Delta，Enmmmmm
 
-#### 软件架构
-软件架构说明
-
-
 #### 安装教程
 
 1.  前往Release页面下载对应架构对应版本的zip文件
