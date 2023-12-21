@@ -1,19 +1,25 @@
-# Magisk On System
+# Magisk On VMOS Pro
 
 #### 介绍
-在不修改boot或recovery的情况下，通过修改/system实现root
-感谢Magisk Delta，Enmmmmm
+
+运行在VMOS Pro上的Magisk
+
+###兼容
+
+Android 9.0-64位
+
+Android 7.1.2-64位
 
 #### 安装教程
 
-前往release页面下载对应架构，对应版本的zip
-每个方案zip对应的方案都不同，以zip中的教程为准
+1.前往release页面下载最新版本
 
-#### 使用说明
+1.将下载的压缩包导入至虚拟机内
 
-注：该方法需要操作system分区，如无法操作system分区，请不要使用此方案
+2.解压压缩包内的文件至任意目录
+
+3.执行安装Magisk.sh
 
 #### 参与贡献
 
-1. 早茶光
-2. Enmmmm
+1. Enmmmm
