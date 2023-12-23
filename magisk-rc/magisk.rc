@@ -1,0 +1,18 @@
+on post-fs-data
+    start logd
+    exec - 0 0 -- /sbin/magisk --post-fs-data
+
+on nonencrypted
+    exec - 0 0 -- /sbin/magisk --service
+
+on property:vold.decrypt=trigger_restart_framework
+    exec - 0 0 -- /sbin/magisk --service
+
+on property:sys.boot_completed=1
+    exec - 0 0 -- /sbin/magisk --boot-complete
+   
+on property:init.svc.zygote=restarting
+    exec - 0 0 -- /sbin/magisk --zygote-restart
+   
+on property:init.svc.zygote=stopped
+    exec - 0 0 -- /sbin/magisk --zygote-restart
