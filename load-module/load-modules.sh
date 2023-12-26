@@ -1,6 +1,6 @@
 #!/system/bin/sh
 #基础变量
-ROOTFS=$(cat /init_shell.sh | xargs -n 1 | grep "init" | xargs dirname)
+ROOTFS=$(cat /init_shell.sh | xargs -n 1 | grep "init" | sed -e "s|/init||" -e "s|user/0|data|")
 #加载列表
 list=$ROOTFS/data/adb/load-module/config/load-list
 #清理列表
