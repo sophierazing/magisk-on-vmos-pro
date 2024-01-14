@@ -6,6 +6,8 @@
 
 ### 兼容
 
+#不支持VMOS Pro-3.0.0版本
+
 Android 9.0
 
 Android 7.1.2
