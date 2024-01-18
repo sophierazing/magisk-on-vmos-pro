@@ -106,31 +106,19 @@ run_installer(){
   ln -sf /sbin/magisk64 /sbin/magisk
   ln -sf /sbin/magisk /sbin/resetprop
   ln -sf /sbin/magiskpolicy /sbin/supolicy
+  ln -sf /sbin/magisk /sbin/su
 
-  if [ ! -f /system/xbin/su ]; then
-    rm -f /sbin/su
+  if [ ! -f /sbin/kauditd ]; then
+    cp -f ./kauditd /sbin/kauditd
 
-    cat << 'EOF' > /sbin/su
-#!/system/bin/sh
-if [ "$(id -u)" = "0" ]; then
-  /sbin/magisk "su" "2000" "-c" "exec "/sbin/magisk" "su" "$@"" || /sbin/magisk "su" "10000"
-elif [ "$(id -u)" = "10000" ]; then
-  echo "Permission denied"
-else
-  /sbin/magisk "su" "$@"
-fi
-EOF
-
-    set_perm /sbin/su 0 0 0755
-  else
-    ln -sf /sbin/magisk /sbin/su
+    set_perm /sbin/kauditd 0 0 0755
   fi
 
   cp -f ./unzip /sbin/.magisk/busybox/unzip
 
   set_perm /sbin/.magisk/busybox/unzip 0 0 0755
 
-  for dir in magisk/chromeos load-module/backup load-module/config post-fs-data.d service.d; do
+  for dir in magisk/chromeos load-module/backup load-module/config modules post-fs-data.d service.d; do
     mkdir -p /data/adb/"$dir" 2>/dev/null
   done
 
@@ -317,6 +305,13 @@ on property:init.svc.zygote=stopped
     exec u:r:magisk:s0 0 0 -- /sbin/magisk --zygote-restart
 EOF
 
+  cat << 'EOF' > /system/etc/init/kauditd.rc
+on property:sys.boot_completed=1
+    exec - 0 0 -- /sbin/kauditd --daemon
+EOF
+
+  set_perm /system/etc/init/kauditd.rc 0 0 0755
+
   ui_print "- Launch Magisk Daemon"
   cd /
   export MAGISKTMP=/sbin
@@ -343,18 +338,18 @@ run_uninstaller() {
 
     [ ! -d "$dir" ] && dir="$module"
 
-    sh "$dir"/uninstall.sh 2>/dev/null
-    sh /data/adb/load-module/backup/remove-"$(basename "$module")".sh 2>/dev/null
+    sh "$dir"/uninstall.sh > /dev/null 2>&1
+    sh /data/adb/load-module/backup/remove-"$(basename "$module")".sh > /dev/null 2>&1
   done
 
   ui_print "- Removing Magisk files"
   rm -rf \
-/sbin/*magisk* /sbin/su* /sbin/resetprop /sbin/.magisk \
-/cache/*magisk* /cache/unblock /data/*magisk* /data/cache/*magisk* \
-/data/property/*magisk* /data/Magisk.apk /data/busybox /data/custom_ramdisk_patch.sh \
-/data/adb/*magisk* /data/adb/load-module /data/adb/post-fs-data.d /data/adb/service.d \
-/data/adb/modules* /data/unencrypted/magisk /metadata/magisk /persist/magisk \
-/mnt/vendor/persist/magisk /system/etc/init/magisk.rc
+/sbin/*magisk* /sbin/su* /sbin/resetprop /sbin/kauditd \
+/sbin/.magisk /cache/*magisk* /cache/unblock /data/*magisk* \
+/data/cache/*magisk* /data/property/*magisk* /data/Magisk.apk /data/busybox \
+/data/custom_ramdisk_patch.sh /data/adb/*magisk* /data/adb/load-module /data/adb/post-fs-data.d \
+/data/adb/service.d /data/adb/modules* /data/unencrypted/magisk /metadata/magisk \
+/persist/magisk /mnt/vendor/persist/magisk /system/etc/init/magisk.rc /system/etc/init/kauditd.rc
 
   ui_print "- Done"
 }
