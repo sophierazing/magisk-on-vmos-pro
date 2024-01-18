@@ -106,23 +106,33 @@ run_installer(){
   ln -sf /sbin/magisk64 /sbin/magisk
   ln -sf /sbin/magisk /sbin/resetprop
   ln -sf /sbin/magiskpolicy /sbin/supolicy
-  ln -sf /sbin/magisk /sbin/su
 
   if [ ! -f /sbin/kauditd ]; then
-    cp -f ./kauditd /sbin/kauditd
+    rm -f /sbin/su
 
-    set_perm /sbin/kauditd 0 0 0755
+    cat << 'EOF' > /sbin/su
+#!/system/bin/sh
+if [ "$(id -u)" = "0" ]; then
+  /sbin/magisk "su" "2000" "-c" "exec "/sbin/magisk" "su" "$@"" || /sbin/magisk "su" "10000"
+elif [ "$(id -u)" = "10000" ]; then
+  echo "Permission denied"
+else
+  /sbin/magisk "su" "$@"
+fi
+EOF
+
+    set_perm /sbin/su 0 0 0755
+  else
+    ln -sf /sbin/magisk /sbin/su
   fi
 
   cp -f ./unzip /sbin/.magisk/busybox/unzip
 
   set_perm /sbin/.magisk/busybox/unzip 0 0 0755
 
-  for dir in magisk/chromeos load-module/backup load-module/config modules post-fs-data.d service.d; do
+  for dir in magisk/chromeos load-module/backup modules post-fs-data.d service.d; do
     mkdir -p /data/adb/"$dir" 2>/dev/null
   done
-
-  mkdir -m 770 /cache/ 2>/dev/null
 
   for file in $(ls ./magisk* ./*.sh) stub.apk; do
     cp -f ./"$file" /data/adb/magisk/"$file"
@@ -267,15 +277,13 @@ elif [ "$@" = --service ]; then
   done
   for module in /data/adb/modules/*; do
     #检测状态
-    [ -f "$module/disable" ] && continue
+    [ -f "$module"/disable ] && continue
     #执行文件
     PATH=/sbin/.magisk/busybox:"$PATH" sh "$module"/service.sh > /dev/null 2>&1 &
   done
 fi
 exit 0
 EOF
-
-  touch /data/adb/load-module/config/load-list 2>/dev/null
 
   set_perm /data/adb/load-module/load-modules.sh 0 0 0755
 
@@ -304,13 +312,6 @@ on property:sys.boot_completed=1
 on property:init.svc.zygote=stopped
     exec u:r:magisk:s0 0 0 -- /sbin/magisk --zygote-restart
 EOF
-
-  cat << 'EOF' > /system/etc/init/kauditd.rc
-on property:sys.boot_completed=1
-    exec - 0 0 -- /sbin/kauditd --daemon
-EOF
-
-  set_perm /system/etc/init/kauditd.rc 0 0 0755
 
   ui_print "- Launch Magisk Daemon"
   cd /
