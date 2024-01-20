@@ -721,13 +721,13 @@ install_module() {
       CONFIG=$(echo "$LIST" | grep "$ROOTFS/system/$TARGET=" | sed "s/=/\n/" | grep -v "$ROOTFS/system/$TARGET")
 
       if [ -f "$MODPATH/system/$TARGET" ]; then
-        if [ -f "$ROOTFS/system/$TARGET" -a "$CONFIG" != "remove" ]; then
+        if [ -f "$ROOTFS/system/$TARGET" -a "$CONFIG" != remove ]; then
           echo "$ROOTFS/system/$TARGET=backup" >> $NVBASE/load-module/config/load-$MODID-list
         else
           echo "$ROOTFS/system/$TARGET=remove" >> $NVBASE/load-module/config/load-$MODID-list
         fi
       elif [ -d "$MODPATH/system/$TARGET" ]; then
-        [ -d "$ROOTFS/system/$TARGET" -a "$CONFIG" != "remove" ] && continue
+        [ -d "$ROOTFS/system/$TARGET" -a "$CONFIG" != remove ] && continue
 
         echo "$ROOTFS/system/$TARGET=remove" >> $NVBASE/load-module/config/load-$MODID-list
       fi
