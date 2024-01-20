@@ -223,7 +223,7 @@ done
         cp -fp "$module"/system/"$target" "$rootfs"/system/"$target"
       elif [ -d "$module"/system/"$target" ]; then
         #检查目录
-        [ -d /system/"$target" -a "$config" != "remove" ] && continue
+        [ -d /system/"$target" -a "$config" != remove ] && continue
         #创建目录
         mkdir "$rootfs"/system/"$target" 2>/dev/null
         #修改文件
