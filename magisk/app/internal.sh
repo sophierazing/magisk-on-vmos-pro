@@ -133,7 +133,7 @@ EOF
     cp -f ./"$file" "$MAGISKBIN"/"$file"
   done
 
-  [ "$IS64BIT" = true ] && cp -f ./busybox-original "$MAGISKBIN"/busybox || cp -f ./busybox "$MAGISKBIN"/busybox
+  [ "$IS64BIT" = true ] && cp -f ./busybox.bin "$MAGISKBIN"/busybox || cp -f ./busybox "$MAGISKBIN"/busybox
   cp -r ./chromeos/* "$MAGISKBIN"/chromeos/
 
   set_perm_recursive "$MAGISKBIN"/ 0 0 0755 0755
@@ -302,9 +302,8 @@ run_uninstaller() {
  "$ROOTFS"/sbin/.magisk "$ROOTFS"/cache/*magisk* "$ROOTFS"/cache/unblock "$ROOTFS"/data/*magisk* \
 "$ROOTFS"/data/cache/*magisk* "$ROOTFS"/data/property/*magisk* "$ROOTFS"/data/Magisk.apk "$ROOTFS"/data/busybox \
 "$ROOTFS"/data/custom_ramdisk_patch.sh "$NVBASE"/*magisk* "$NVBASE"/load-module "$NVBASE"/post-fs-data.d \
-"$NVBASE"/service.d "$NVBASE"/modules* "$ROOTFS"/data/local/tmp/busybox "$ROOTFS"/data/unencrypted/magisk \
-"$ROOTFS"/metadata/magisk "$ROOTFS"/persist/magisk "$ROOTFS"/mnt/vendor/persist/magisk "$ROOTFS"/system/etc/init/magisk.rc \
-"$ROOTFS"/system/etc/init/kauditd.rc
+"$NVBASE"/service.d "$NVBASE"/modules* "$ROOTFS"/data/unencrypted/magisk "$ROOTFS"/metadata/magisk \
+"$ROOTFS"/persist/magisk "$ROOTFS"/mnt/vendor/persist/magisk "$ROOTFS"/system/etc/init/magisk.rc "$ROOTFS"/system/etc/init/kauditd.rc
 
   ui_print "- Done"
 }
