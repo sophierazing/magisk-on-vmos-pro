@@ -87,7 +87,7 @@ run_installer(){
 
   ui_print "- Extracting Magisk files"
   for dir in block mirror worker; do
-    mkdir -p "$MAGISKTMP"/.magisk/"$dir" 2>/dev/null
+    mkdir -p "$MAGISKTMP"/.magisk/"$dir"/ 2>/dev/null
   done
 
   touch "$MAGISKTMP"/.magisk/config 2>/dev/null
@@ -126,8 +126,10 @@ EOF
   fi
 
   for dir in magisk/chromeos load-module/backup load-module/config post-fs-data.d service.d; do
-    mkdir -p /data/adb/"$dir" 2>/dev/null
+    mkdir -p "$NVBASE"/"$dir"/ 2>/dev/null
   done
+
+  mkdir "$ROOTFS"/cache/ 2>/dev/null
 
   for file in $(ls ./magisk* ./*.sh) stub.apk; do
     cp -f ./"$file" "$MAGISKBIN"/"$file"
@@ -210,9 +212,9 @@ done
           #创建目录
           mkdir -p "$bin"/backup/system/"$(dirname "$target")" 2>/dev/null
           #复制文件
-          cp -p "$rootfs"/system/"$target" "$bin"/backup/system/"$target" || continue
+          mv "$rootfs"/system/"$target" "$bin"/backup/system/"$target" || continue
           #修改文件
-          echo -e "cp -fp $bin/backup/system/$target $rootfs/system/$target\nrm $bin/backup/system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo "mv -f $bin/backup/system/$target $rootfs/system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
         elif [ "$config" = remove ]; then
           #修改文件
           echo "rm -f $rootfs/system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
@@ -270,9 +272,9 @@ EOF
   cd /
   export MAGISKTMP=/sbin
 
-  /sbin/magisk --post-fs-data
-  /sbin/magisk --service
-  /sbin/magisk --boot-complete
+  "$MAGISKTMP"/magisk --post-fs-data
+  "$MAGISKTMP"/magisk --service
+  "$MAGISKTMP"/magisk --boot-complete
 }
 
 run_uninstaller() {
@@ -299,7 +301,7 @@ run_uninstaller() {
   ui_print "- Removing Magisk files"
   rm -rf \
 "$ROOTFS"/sbin/*magisk* "$ROOTFS"/sbin/su* "$ROOTFS"/sbin/resetprop "$ROOTFS"/sbin/kauditd \
- "$ROOTFS"/sbin/.magisk "$ROOTFS"/cache/*magisk* "$ROOTFS"/cache/unblock "$ROOTFS"/data/*magisk* \
+"$ROOTFS"/sbin/.magisk "$ROOTFS"/cache/*magisk* "$ROOTFS"/cache/unblock "$ROOTFS"/data/*magisk* \
 "$ROOTFS"/data/cache/*magisk* "$ROOTFS"/data/property/*magisk* "$ROOTFS"/data/Magisk.apk "$ROOTFS"/data/busybox \
 "$ROOTFS"/data/custom_ramdisk_patch.sh "$NVBASE"/*magisk* "$NVBASE"/load-module "$NVBASE"/post-fs-data.d \
 "$NVBASE"/service.d "$NVBASE"/modules* "$ROOTFS"/data/unencrypted/magisk "$ROOTFS"/metadata/magisk \
