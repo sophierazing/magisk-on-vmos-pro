@@ -96,9 +96,9 @@ run_installer(){
   touch "$MAGISKTMP"/.magisk/config 2>/dev/null
 
   for file in magisk32 magisk64 magiskpolicy magiskinit; do
-    cp -f ./"$file" "$MAGISKTMP"/"$file"
+    cp -f ./"$file" "$MAGISKTMP"/"$file" 2>/dev/null
 
-    set_perm "$MAGISKTMP"/"$file" 0 0 0755
+    set_perm "$MAGISKTMP"/"$file" 0 0 0755 2>/dev/null
   done
 
   set_perm "$MAGISKTMP"/magiskinit 0 0 0750
@@ -132,7 +132,7 @@ EOF
 
   set_perm "$MAGISKTMP"/.magisk/busybox/unzip 0 0 0755
 
-  for dir in magisk/chromeos load-module/backup post-fs-data.d service.d; do
+  for dir in magisk/chromeos load-module/backup modules post-fs-data.d service.d; do
     mkdir -p "$NVBASE"/"$dir"/ 2>/dev/null
   done
 
@@ -265,7 +265,7 @@ elif [ "$@" = --post-fs-data ]; then
       fi
     done
   } & done
-  #等待执行
+  #等待加载
   wait
   #重启服务
   if [ "$restart" ]; then
@@ -316,6 +316,8 @@ on property:sys.boot_completed=1
 on property:init.svc.zygote=stopped
     exec u:r:magisk:s0 0 0 -- /sbin/magisk --zygote-restart
 EOF
+
+  set_perm /system/etc/init/magisk.rc 0 0 0644
 
   ui_print "- Launch Magisk Daemon"
   cd /
