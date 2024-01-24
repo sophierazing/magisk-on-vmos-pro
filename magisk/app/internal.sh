@@ -224,7 +224,7 @@ elif [ "$@" = --post-fs-data ]; then
       echo "$prop" | sed "s/=/ /" | xargs setprop 2>/dev/null
     done
     #检测状态
-    [ ! -f "$bin"/backup/remove-"$(basename "$module")".sh -o -f "$module"/skip_mount -o ! -d "$module"/system/ ] && continue
+    [ -f "$bin"/backup/remove-"$(basename "$module")".sh -o -f "$module"/skip_mount -o ! -d "$module"/system/ ] && continue
     #重启服务
     if [ -z "$restart" ]; then
       #停止服务
