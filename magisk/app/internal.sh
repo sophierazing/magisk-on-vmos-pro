@@ -129,8 +129,10 @@ EOF
   fi
 
   cp -f ./unzip "$MAGISKTMP"/.magisk/busybox/unzip
+  cp -f ./awk "$MAGISKTMP"/.magisk/busybox/awk
 
   set_perm "$MAGISKTMP"/.magisk/busybox/unzip 0 0 0755
+  set_perm "$MAGISKTMP"/.magisk/busybox/awk 0 0 0755
 
   for dir in magisk/chromeos load-module/backup modules post-fs-data.d service.d; do
     mkdir -p "$NVBASE"/"$dir"/ 2>/dev/null
