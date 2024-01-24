@@ -77,6 +77,11 @@ check_install(){
 
   # Check architecture
   [ "$IS64BIT" != true ] && exit
+
+  # Custom installer name
+  NAME="$(getprop ro.magisk.installer.name)"
+
+  [ -z "$NAME" ] && NAME="VMOS Pro"
 }
 
 run_installer(){
