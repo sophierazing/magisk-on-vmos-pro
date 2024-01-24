@@ -216,7 +216,7 @@ elif [ "$@" = --post-fs-data ]; then
     PATH=/sbin/.magisk/busybox:"$PATH" sh "$module"/post-fs-data.sh > /dev/null 2>&1
   done
   #加载模块
-  for module in /data/adb/modules/*; do {
+  for module in /data/adb/modules/*; do
     #检测状态
     [ -f "$module"/disable ] && continue
     #修改属性
@@ -266,9 +266,7 @@ elif [ "$@" = --post-fs-data ]; then
         echo "rm -rf /system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
       fi
     done
-  } & done
-  #等待加载
-  wait
+  done
   #重启服务
   if [ "$restart" ]; then
     #启动服务
@@ -277,16 +275,16 @@ elif [ "$@" = --post-fs-data ]; then
   fi
 elif [ "$@" = --service ]; then
   #执行文件
-  for scripts in /data/adb/service.d/*; do {
+  for scripts in /data/adb/service.d/*; do
     #执行文件
-    PATH=/sbin/.magisk/busybox:"$PATH" sh "$scripts" > /dev/null 2>&1
-  } & done
-  for module in /data/adb/modules/*; do {
+    PATH=/sbin/.magisk/busybox:"$PATH" sh "$scripts" > /dev/null 2>&1 &
+  done
+  for module in /data/adb/modules/*; do
     #检测状态
     [ -f "$module"/disable ] && continue
     #执行文件
-    PATH=/sbin/.magisk/busybox:"$PATH" sh "$module"/service.sh > /dev/null 2>&1
-  } & done
+    PATH=/sbin/.magisk/busybox:"$PATH" sh "$module"/service.sh > /dev/null 2>&1 &
+  done
 fi
 exit 0
 EOF
