@@ -133,11 +133,11 @@ EOF
     ln -sf "$MAGISKTMP"/magisk "$MAGISKTMP"/su
   fi
 
-  cp -f ./unzip "$MAGISKTMP"/.magisk/busybox/unzip
-  cp -f ./awk "$MAGISKTMP"/.magisk/busybox/awk
+  for tool in unzip awk; do
+    cp -f ./"$tool" "$MAGISKTMP"/.magisk/busybox/"$tool"
 
-  set_perm "$MAGISKTMP"/.magisk/busybox/unzip 0 0 0755
-  set_perm "$MAGISKTMP"/.magisk/busybox/awk 0 0 0755
+    set_perm "$MAGISKTMP"/.magisk/busybox/"$tool" 0 0 0755
+  done
 
   for dir in magisk/chromeos load-module/backup modules post-fs-data.d service.d; do
     mkdir -p "$NVBASE"/"$dir"/ 2>/dev/null
