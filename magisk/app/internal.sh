@@ -114,9 +114,14 @@ run_installer(){
   ln -sf "$MAGISKTMP"/magisk "$MAGISKTMP"/resetprop
   ln -sf "$MAGISKTMP"/magiskpolicy "$MAGISKTMP"/supolicy
 
-  if [ ! -f "$MAGISKTMP"/kauditd ]; then
-    rm -f "$MAGISKTMP"/su
+  rm -f "$MAGISKTMP"/su
 
+  if [ -f "$MAGISKTMP"/kauditd ]; then
+    cat << 'EOF' > "$MAGISKTMP"/su
+#!/system/bin/sh
+/sbin/magisk "su" "$@"
+EOF
+  else
     cat << 'EOF' > "$MAGISKTMP"/su
 #!/system/bin/sh
 if [ "$(id -u)" = "0" ]; then
@@ -127,11 +132,9 @@ else
   /sbin/magisk "su" "$@"
 fi
 EOF
-
-    set_perm "$MAGISKTMP"/su 0 0 0755
-  else
-    ln -sf "$MAGISKTMP"/magisk "$MAGISKTMP"/su
   fi
+
+  set_perm "$MAGISKTMP"/su 0 0 0755
 
   for tool in unzip awk; do
     cp -f ./"$tool" "$MAGISKTMP"/.magisk/busybox/"$tool"
