@@ -124,9 +124,9 @@ EOF
   else
     cat << 'EOF' > "$MAGISKTMP"/su
 #!/system/bin/sh
-if [ "$(id -u)" = "0" ]; then
+if [ "$(id -u)" = 0 ]; then
   /sbin/magisk "su" "2000" "-c" "exec "/sbin/magisk" "su" "$@"" || /sbin/magisk "su" "10000"
-elif [ "$(id -u)" = "10000" ]; then
+elif [ "$(id -u)" = 10000 ]; then
   echo "Permission denied"
 else
   /sbin/magisk "su" "$@"
@@ -166,6 +166,7 @@ if [ -z "$@" ]; then
 elif [ "$@" = --post-fs-data ]; then
   #执行文件
   for scripts in /data/adb/post-fs-data.d/*; do
+    #执行文件
     PATH=/sbin/.magisk/busybox:"$PATH" sh "$scripts" > /dev/null 2>&1
   done
   #更新模块
@@ -255,7 +256,7 @@ elif [ "$@" = --post-fs-data ]; then
           [ -f "$bin"/backup/system/"$target" ] && continue
           #创建目录
           mkdir -p "$bin"/backup/system/"$(dirname "$target")" 2>/dev/null
-          #复制文件
+          #移动文件
           mv /system/"$target" "$bin"/backup/system/"$target" || continue
           #修改文件
           echo -e "mv -f $bin/backup/system/$target /system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
