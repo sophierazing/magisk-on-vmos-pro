@@ -185,6 +185,8 @@ elif [ "$@" = --post-fs-data ]; then
         #删除文件
         rm -f "$module"/update
       fi
+      #删除变量
+      unset dir
     elif [ -f "$module"/remove ]; then
       #执行文件
       PATH=/sbin/.magisk/busybox:"$PATH" sh "$module"/uninstall.sh > /dev/null 2>&1
@@ -233,7 +235,19 @@ elif [ "$@" = --post-fs-data ]; then
       echo "$prop" | sed "s/=/ /" | xargs setprop 2>/dev/null
     done
     #检测状态
-    [ -f "$bin"/backup/remove-"$(basename "$module")".sh -o -f "$module"/skip_mount -o ! -d "$module"/system/ ] && continue
+    [ -f "$bin"/backup/remove-"$(basename "$module")".sh -o -f "$module"/skip_mount ] && continue
+    #检测目录
+    if [ -d "$module"/rootfs/ ]; then
+      #加载目录
+      load=rootfs
+    elif [ -d "$module"/system/ ]; then
+      #加载目录
+      load=system
+      #目标目录
+      dir=/system
+    else
+      continue
+    fi
     #重启服务
     if [ -z "$restart" ]; then
       #停止服务
@@ -243,38 +257,43 @@ elif [ "$@" = --post-fs-data ]; then
       restart=true
     fi
     #切换目录
-    cd "$module"/system
+    cd "$module"/"$load"
     #加载文件
     for file in $(find); do
       #目标文件
       target="$(echo "$file" | sed "s/..//")"
       #检查类型
-      if [ -f "$module"/system/"$target" ]; then
+      if [ -f "$module"/"$load"/"$target" ]; then
         #备份文件
-        if [ -f /system/"$target" ]; then
+        if [ -f "$dir"/"$target" ]; then
           #检查文件
-          [ -f "$bin"/backup/system/"$target" ] && continue
+          [ -f "$bin"/backup/"$load"/"$target" ] && continue
           #创建目录
-          mkdir -p "$bin"/backup/system/"$(dirname "$target")" 2>/dev/null
+          mkdir -p "$bin"/backup/"$load"/"$(dirname "$target")" 2>/dev/null
           #移动文件
-          mv /system/"$target" "$bin"/backup/system/"$target" || continue
+          mv "$dir"/"$target" "$bin"/backup/"$load"/"$target" || continue
           #修改文件
-          echo -e "mv -f $bin/backup/system/$target /system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo -e "mv -f $bin/backup/$load/$target $dir/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
         else
           #修改文件
-          echo "rm -f /system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo "rm -f $dir/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
         fi
         #复制文件
-        cp -fp "$module"/system/"$target" /system/"$target"
-      elif [ -d "$module"/system/"$target" ]; then
+        cp -fp "$module"/"$load"/"$target" "$dir"/"$target"
+      elif [ -d "$module"/"$load"/"$target" ]; then
         #检查目录
-        [ -d /system/"$target" ] && continue
+        [ -d "$dir"/"$target" ] && continue
         #创建目录
-        mkdir /system/"$target"
+        mkdir "$dir"/"$target"
         #修改文件
-        echo "rm -rf /system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+        echo "rm -rf $dir/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
       fi
+      #删除变量
+      unset target
     done
+    #删除变量
+    unset load
+    unset dir
   done
   #重启服务
   if [ "$restart" ]; then
@@ -496,7 +515,7 @@ get_flags() {
   else
     PATCHVBMETAFLAG=true
   fi
-  [ -z $RECOVERYMODE ] && RECOVERYMODE=false
+  [ -z $SYSTEMMODE ] && SYSTEMMODE=false
 }
 
 run_migrations() { return; }
