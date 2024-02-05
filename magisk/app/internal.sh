@@ -379,32 +379,30 @@ run_uninstaller() {
 
   ui_print "- Removing Magisk files"
   rm -rf \
-/sbin/*magisk* /sbin/su* /sbin/resetprop /sbin/kauditd \
-/sbin/.magisk /cache/*magisk* /cache/unblock /data/*magisk* \
-/data/cache/*magisk* /data/property/*magisk* /data/Magisk.apk /data/busybox \
-/data/custom_ramdisk_patch.sh "$NVBASE"/*magisk* "$NVBASE"/load-module "$NVBASE"/post-fs-data.d \
-"$NVBASE"/service.d "$NVBASE"/modules* /data/unencrypted/magisk /metadata/magisk \
-/persist/magisk /mnt/vendor/persist/magisk /system/etc/init/magisk.rc /system/etc/init/kauditd.rc
+  /sbin/*magisk* /sbin/su* /sbin/resetprop /sbin/kauditd \
+  /sbin/.magisk /cache/*magisk* /cache/unblock /data/*magisk* \
+  /data/cache/*magisk* /data/property/*magisk* /data/Magisk.apk /data/busybox \
+  /data/custom_ramdisk_patch.sh "$NVBASE"/*magisk* "$NVBASE"/load-module "$NVBASE"/post-fs-data.d \
+  "$NVBASE"/service.d "$NVBASE"/modules* /data/unencrypted/magisk /metadata/magisk \
+  /persist/magisk /mnt/vendor/persist/magisk /system/etc/init/magisk.rc /system/etc/init/kauditd.rc
 
   ui_print "- Done"
 }
 
-restore_imgs() {
-  [ -z $SHA1 ] && return 1
-  local BACKUPDIR=/data/magisk_backup_$SHA1
-  [ -d $BACKUPDIR ] || return 1
+restore_system() {
+  # Remove modules load files
+  for module in "$NVBASE"/modules/*; do
+    dir="$(echo "$module" | sed "s/modules/modules_update/")"
 
-  get_flags
-  find_boot_image
+    [ ! -d "$dir" ] && dir="$module"
 
-  for name in dtb dtbo; do
-    [ -f $BACKUPDIR/${name}.img.gz ] || continue
-    local IMAGE=$(find_block $name$SLOT)
-    [ -z $IMAGE ] && continue
-    flash_image $BACKUPDIR/${name}.img.gz $IMAGE
+    sh "$NVBASE"/load-module/backup/remove-"$(basename "$module")".sh > /dev/null 2>&1
   done
-  [ -f $BACKUPDIR/boot.img.gz ] || return 1
-  flash_image $BACKUPDIR/boot.img.gz $BOOTIMAGE
+
+  # Remove Magisk files
+  rm -rf \
+  /sbin/*magisk* /sbin/su* /sbin/resetprop /sbin/kauditd \
+  /sbin/.magisk "$NVBASE"/load-module/backup/* /system/etc/init/magisk.rc /system/etc/init/kauditd.rc
 }
 
 post_ota() {
@@ -457,12 +455,8 @@ adb_pm_install() {
 }
 
 check_boot_ramdisk() {
-  # Create boolean ISAB
-  ISAB=true
-  [ -z $SLOT ] && ISAB=false
-
   # Override system mode to true
-  SYSTEMMODE=true
+  SYSYEMMODE=true
   return 1
 }
 
