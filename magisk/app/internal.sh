@@ -246,6 +246,7 @@ elif [ "$@" = --post-fs-data ]; then
       #目标目录
       dir=/system
     else
+      #跳过加载
       continue
     fi
     #重启服务
@@ -264,29 +265,43 @@ elif [ "$@" = --post-fs-data ]; then
       target="$(echo "$file" | sed "s/..//")"
       #检查类型
       if [ -f "$module"/"$load"/"$target" ]; then
+        #检测文件
+        [ "$(basename "$target")" = .replace ] && continue 
         #备份文件
         if [ -f "$dir"/"$target" ]; then
           #检查文件
           [ -f "$bin"/backup/"$load"/"$target" ] && continue
           #创建目录
-          mkdir -p "$bin"/backup/"$load"/"$(dirname "$target")" 2>/dev/null
+          mkdir -p "$bin"/backup/"$load"/"$(dirname "$target")"/ 2>/dev/null
           #移动文件
           mv "$dir"/"$target" "$bin"/backup/"$load"/"$target" || continue
           #修改文件
-          echo -e "mv -f $bin/backup/$load/$target $dir/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo "mv -f $bin/backup/$load/$target $dir/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
         else
           #修改文件
           echo "rm -f $dir/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
         fi
         #复制文件
-        cp -fp "$module"/"$load"/"$target" "$dir"/"$target"
-      elif [ -d "$module"/"$load"/"$target" ]; then
+        cp -af "$module"/"$load"/"$target" "$dir"/"$target"
+      elif [ -d "$module"/"$load"/"$target"/ ]; then
         #检查目录
-        [ -d "$dir"/"$target" ] && continue
-        #创建目录
-        mkdir "$dir"/"$target"
-        #修改文件
-        echo "rm -rf $dir/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+        if [ -d "$dir"/"$target"/ ]; then
+          #检测文件
+          [ ! -f "$module"/"$load"/"$target"/.replace ] && continue
+          #创建目录
+          mkdir -p "$bin"/backup/"$load"/"$target"/ 2>/dev/null
+          #复制文件
+          cp -a "$dir"/"$target"/* "$bin"/backup/"$load"/"$target"
+          #清空目录
+          rm -rf "$dir"/"$target"/*
+          #修改文件
+          echo -e "cp -a "$bin"/backup/"$load"/"$target"/* "$dir"/"$target"/\nrm -rf "$bin"/backup/"$load"/"$target"/*" >> "$bin"/backup/remove-"$(basename "$module")".sh
+        else
+          #创建目录
+          mkdir "$dir"/"$target"/
+          #修改文件
+          echo "rm -rf $dir/$target/" >> "$bin"/backup/remove-"$(basename "$module")".sh
+        fi
       fi
       #删除变量
       unset target
