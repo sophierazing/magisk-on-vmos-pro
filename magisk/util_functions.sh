@@ -126,8 +126,49 @@ setup_flashable() {
 }
 
 ensure_bb() {
-  # add tools binary dir to PATH
-  export PATH=$(magisk --path)/.magisk/busybox:$PATH
+  if set -o | grep -q standalone; then
+    # We are definitely in busybox ash
+    set -o standalone
+    return
+  fi
+
+  # Find our busybox binary
+  local bb
+  if [ -f $TMPDIR/busybox ]; then
+    bb=$TMPDIR/busybox
+  elif [ -f $MAGISKBIN/busybox ]; then
+    bb=$MAGISKBIN/busybox
+  else
+    abort "! Cannot find BusyBox"
+  fi
+  chmod 755 $bb
+
+  # Busybox could be a script, make sure /system/bin/sh exists
+  if [ ! -f /system/bin/sh ]; then
+    umount -l /system 2>/dev/null
+    mkdir -p /system/bin
+    ln -s $(command -v sh) /system/bin/sh
+  fi
+
+  export ASH_STANDALONE=1
+
+  # Find our current arguments
+  # Run in busybox environment to ensure consistent results
+  # /proc/<pid>/cmdline shall be <interpreter> <script> <arguments...>
+  local cmds="$($bb sh -c "
+  for arg in \$(tr '\0' '\n' < /proc/$$/cmdline); do
+    if [ -z \"\$cmds\" ]; then
+      # Skip the first argument as we want to change the interpreter
+      cmds=\"sh\"
+    else
+      cmds=\"\$cmds '\$arg'\"
+    fi
+  done
+  echo \$cmds")"
+
+  # Re-exec our script
+  echo $cmds | $bb xargs $bb
+  exit
 }
 
 recovery_actions() {
@@ -665,6 +706,36 @@ install_module() {
     cp -af $MODPATH/module.prop $NVBASE/modules/$MODID/module.prop
   fi
 
+  # Detect mount files
+  if [ -d $MODPATH/system/ ]; then
+    if [ -f $NVBASE/load-module/config/load-$MODID-list ]; then
+      LIST=$(cat $NVBASE/load-module/config/load-$MODID-list)
+
+      rm -f $NVBASE/load-module/config/load-$MODID-list
+    fi
+
+    cd $MODPATH/system
+
+    for FILE in $(find); do
+      TARGET=$(echo "$FILE" | sed "s/..//")
+      CONFIG=$(echo "$LIST" | grep "$ROOTFS/system/$TARGET=" | sed "s/=/ /" | awk '{print $2}')
+
+      if [ -f "$MODPATH/system/$TARGET" ]; then
+        if [ -f "$ROOTFS/system/$TARGET" -a "$CONFIG" != remove ]; then
+          echo "$ROOTFS/system/$TARGET=backup" >> $NVBASE/load-module/config/load-$MODID-list
+        else
+          echo "$ROOTFS/system/$TARGET=remove" >> $NVBASE/load-module/config/load-$MODID-list
+        fi
+      elif [ -d "$MODPATH/system/$TARGET" ]; then
+        [ -d "$ROOTFS/system/$TARGET" -a "$CONFIG" != remove ] && continue
+
+        echo "$ROOTFS/system/$TARGET=remove" >> $NVBASE/load-module/config/load-$MODID-list
+      fi
+    done
+
+    set_perm $NVBASE/load-module/config/load-$MODID-list 0 0 0644
+  fi
+
   # Remove stuff that doesn't belong to modules and clean up any empty directories
   rm -rf \
   $MODPATH/system/placeholder $MODPATH/customize.sh \
@@ -687,5 +758,6 @@ install_module() {
 [ -z $BOOTMODE ] && ps -A 2>/dev/null | grep zygote | grep -qv grep && BOOTMODE=true
 [ -z $BOOTMODE ] && BOOTMODE=false
 
-set_nvbase "/data/adb"
+ROOTFS=$(dir=$(cat /init_shell.sh | xargs -n 1 | grep "init" | sed "s|/init||"); [ -d "$dir" ] && echo "$dir" || echo "$(echo "$dir" | sed "s|user/0|data|")")
+set_nvbase "$ROOTFS/data/adb"
 TMPDIR=$NVBASE/tmp
