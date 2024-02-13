@@ -7,7 +7,7 @@ run_delay() {
 }
 
 env_check() {
-  for file in magiskboot magiskinit util_functions.sh boot_patch.sh; do
+  for file in busybox magiskboot magiskinit util_functions.sh boot_patch.sh; do
     [ -f "$MAGISKBIN/$file" ] || return 1
   done
   if [ "$2" -ge 25000 ]; then
@@ -69,19 +69,11 @@ direct_install() {
 }
 
 check_install(){
-  # Detect Android version/architecture
+  # Detect Android version
   api_level_arch_detect
 
   # Check Android version
   [ "$API" != 28 ] && [ "$API" != 25 ] && exit
-
-  # Check architecture
-  [ "$IS64BIT" != true ] && exit
-
-  # Custom installer name
-  NAME="$(getprop ro.magisk.installer.name)"
-
-  [ -z "$NAME" ] && NAME="VMOS Pro"
 }
 
 run_installer(){
@@ -91,10 +83,10 @@ run_installer(){
   # Detect Android version
   api_level_arch_detect
 
-  MAGISKTMP=/sbin
+  MAGISKTMP="$ROOTFS"/sbin
 
   ui_print "- Extracting Magisk files"
-  for dir in block busybox mirror worker; do
+  for dir in block mirror worker; do
     mkdir -p "$MAGISKTMP"/.magisk/"$dir"/ 2>/dev/null
   done
 
@@ -110,7 +102,7 @@ run_installer(){
 
   [ ! -L "$MAGISKTMP"/.magisk/modules ] && ln -s "$NVBASE"/modules "$MAGISKTMP"/.magisk/modules
 
-  ln -sf "$MAGISKTMP"/magisk64 "$MAGISKTMP"/magisk
+  [ "$IS64BIT" = true ] && ln -sf "$MAGISKTMP"/magisk64 "$MAGISKTMP"/magisk || ln -sf "$MAGISKTMP"/magisk32 "$MAGISKTMP"/magisk
   ln -sf "$MAGISKTMP"/magisk "$MAGISKTMP"/resetprop
   ln -sf "$MAGISKTMP"/magiskpolicy "$MAGISKTMP"/supolicy
 
@@ -136,98 +128,60 @@ EOF
 
   set_perm "$MAGISKTMP"/su 0 0 0755
 
-  for tool in unzip awk; do
-    cp -f ./"$tool" "$MAGISKTMP"/.magisk/busybox/"$tool"
-
-    set_perm "$MAGISKTMP"/.magisk/busybox/"$tool" 0 0 0755
-  done
-
-  for dir in magisk/chromeos load-module/backup modules post-fs-data.d service.d; do
+  for dir in magisk/chromeos load-module/backup load-module/config post-fs-data.d service.d; do
     mkdir -p "$NVBASE"/"$dir"/ 2>/dev/null
   done
+
+  mkdir -m 750 "$ROOTFS"/cache/ 2>/dev/null
 
   for file in $(ls ./magisk* ./*.sh) stub.apk; do
     cp -f ./"$file" "$MAGISKBIN"/"$file"
   done
 
+  [ "$IS64BIT" = true ] && cp -f ./busybox.bin "$MAGISKBIN"/busybox || cp -f ./busybox "$MAGISKBIN"/busybox
   cp -r ./chromeos/* "$MAGISKBIN"/chromeos/
 
   set_perm_recursive "$MAGISKBIN"/ 0 0 0755 0755
 
-  cat << 'EOF' > "$NVBASE"/load-module/load-modules.sh
+  cat << 'EOF' > "$NVBASE"/post-fs-data.d/load-modules.sh
 #!/system/bin/sh
 #默认权限
 umask 022
+#基础变量
+rootfs="$(dir="$(cat /init_shell.sh | xargs -n 1 | grep "init" | sed "s|/init||")"; [ -d "$dir" ] && echo "$dir" || echo "$(echo "$dir" | sed "s|user/0|data|")")"
 #数据目录
-bin=/data/adb/load-module
-#获取输入
-if [ -z "$@" ]; then
-  exit 1
-elif [ "$@" = --post-fs-data ]; then
+bin="$rootfs"/data/adb/load-module
+#加载列表
+list="$bin"/config/load-list
+#清理列表
+sed -i "/^$/d" "$list"
+#恢复更改
+for module in $(cat "$list"); do
+  #检测状态
+  [ -d "$module"/ -a ! -f "$module"/update -a ! -f "$module"/skip_mount -a ! -f "$module"/disable -a ! -f "$module"/remove ] && continue
+  #重启服务
+  if [ -z "$restart" ]; then
+    #停止服务
+    setprop ctl.stop zygote
+    setprop ctl.stop zygote_secondary
+    #启用重启
+    restart=true
+  fi
   #执行文件
-  for scripts in /data/adb/post-fs-data.d/*; do
-    #执行文件
-    PATH=/sbin/.magisk/busybox:"$PATH" sh "$scripts" > /dev/null 2>&1
-  done
-  #更新模块
-  for module in /data/adb/modules/*; do
-    #检测状态
-    if [ -f "$module"/update ]; then
-      #模块目录
-      dir="$(echo "$module" | sed "s/modules/modules_update/")"
-      #检测目录
-      if [ -d "$dir" ]; then
-        #删除文件
-        rm -rf "$module"
-        #复制文件
-        mv -f "$dir" "$module"
-      else
-        #删除文件
-        rm -f "$module"/update
-      fi
-      #删除变量
-      unset dir
-    elif [ -f "$module"/remove ]; then
-      #执行文件
-      PATH=/sbin/.magisk/busybox:"$PATH" sh "$module"/uninstall.sh > /dev/null 2>&1
-      #删除文件
-      rm -rf "$module"
-    else
-      #检测状态
-      [ ! -f "$module"/skip_mount -a ! -f "$module"/disable ] && continue
-    fi
-    #重启服务
-    if [ -z "$restart" ]; then
-      #停止服务
-      setprop ctl.stop zygote
-      setprop ctl.stop zygote_secondary
-      #启用重启
-      restart=true
-    fi
-    #执行文件
-    sh "$bin"/backup/remove-"$(basename "$module")".sh > /dev/null 2>&1
-    #删除文件
-    rm -f "$bin"/backup/remove-"$(basename "$module")".sh
-  done
-  #删除目录
-  rm -rf /data/adb/modules_update/
-  #执行文件
-  for module in /data/adb/modules/*; do
-    #检测状态
-    [ -f "$module"/disable ] && continue
-    #重启服务
-    if [ -z "$restart" ]; then
-      #停止服务
-      setprop ctl.stop zygote
-      setprop ctl.stop zygote_secondary
-      #启用重启
-      restart=true
-    fi
-    #执行文件
-    PATH=/sbin/.magisk/busybox:"$PATH" sh "$module"/post-fs-data.sh > /dev/null 2>&1
-  done
+  sh "$bin"/backup/remove-"$(basename "$module")".sh > /dev/null 2>&1
+  #删除文件
+  rm -f "$bin"/backup/remove-"$(basename "$module")".sh
+  #删除配置
+  [ -f "$module"/remove ] && rm -f "$bin"/config/load-"$(basename "$module")"-list
+  #修改文件
+  sed -i "s|$module||" "$list"
+done
+#并行运行
+{
+  #等待加载
+  while [ -z "$(cat "$rootfs"/cache/magisk.log | grep "* Loading modules")" ]; do sleep 0.0; done
   #加载模块
-  for module in /data/adb/modules/*; do
+  for module in "$rootfs"/data/adb/modules/*; do
     #检测状态
     [ -f "$module"/disable ] && continue
     #修改属性
@@ -235,20 +189,7 @@ elif [ "$@" = --post-fs-data ]; then
       echo "$prop" | sed "s/=/ /" | xargs setprop 2>/dev/null
     done
     #检测状态
-    [ -f "$bin"/backup/remove-"$(basename "$module")".sh -o -f "$module"/skip_mount ] && continue
-    #检测目录
-    if [ -d "$module"/rootfs/ ]; then
-      #加载目录
-      load=rootfs
-    elif [ -d "$module"/system/ ]; then
-      #加载目录
-      load=system
-      #目标目录
-      dir=/system
-    else
-      #跳过加载
-      continue
-    fi
+    [ "$(cat "$list" | grep "$module")" -o -f "$module"/skip_mount -o ! -d "$module"/system/ -o ! -f "$bin"/config/load-"$(basename "$module")"-list ] && continue
     #重启服务
     if [ -z "$restart" ]; then
       #停止服务
@@ -258,54 +199,62 @@ elif [ "$@" = --post-fs-data ]; then
       restart=true
     fi
     #切换目录
-    cd "$module"/"$load"
+    cd "$module"/system
     #加载文件
     for file in $(find); do
       #目标文件
       target="$(echo "$file" | sed "s/..//")"
+      #加载配置
+      config="$(cat "$bin"/config/load-"$(basename "$module")"-list | grep "$rootfs/system/$target=" | sed "s/=/ /" | awk '{print $2}')"
       #检查类型
-      if [ -f "$module"/"$load"/"$target" ]; then
+      if [ -f "$module"/system/"$target" ]; then
         #检测文件
         [ "$(basename "$target")" = .replace ] && continue 
         #备份文件
-        if [ -f "$dir"/"$target" ]; then
+        if [ "$config" = backup ]; then
           #检查文件
-          [ -f "$bin"/backup/"$load"/"$target" ] && continue
+          [ -f "$bin"/backup/system/"$target" ] && continue
           #创建目录
-          mkdir -p "$bin"/backup/"$load"/"$(dirname "$target")"/ 2>/dev/null
-          #移动文件
-          mv "$dir"/"$target" "$bin"/backup/"$load"/"$target" || continue
+          mkdir -p "$bin"/backup/system/"$(dirname "$target")"/ 2>/dev/null
+          #复制文件
+          mv "$rootfs"/system/"$target" "$bin"/backup/system/"$target" || continue
           #修改文件
-          echo "mv -f $bin/backup/$load/$target $dir/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo "mv -f $bin/backup/system/$target $rootfs/system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+        elif [ "$config" = remove ]; then
+          #修改文件
+          echo "rm -f $rootfs/system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
         else
-          #修改文件
-          echo "rm -f $dir/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          #跳过加载
+          continue
         fi
         #复制文件
-        cp -af "$module"/"$load"/"$target" "$dir"/"$target"
-      elif [ -d "$module"/"$load"/"$target"/ ]; then
+        cp -af "$module"/system/"$target" "$rootfs"/system/"$target"
+      elif [ -d "$module"/system/"$target" ]; then
         #检查目录
-        if [ -d "$dir"/"$target"/ ]; then
-          #检测文件
-          [ ! -f "$module"/"$load"/"$target"/.replace ] && continue
+        if [ "$config" = remove ]; then
           #创建目录
-          mkdir -p "$bin"/backup/"$load"/"$target"/ 2>/dev/null
-          #复制文件
-          cp -a "$dir"/"$target"/* "$bin"/backup/"$load"/"$target"
-          #清空目录
-          rm -rf "$dir"/"$target"/*
+          mkdir "$rootfs"/system/"$target"/
           #修改文件
-          echo -e "cp -a "$bin"/backup/"$load"/"$target"/* "$dir"/"$target"/\nrm -rf "$bin"/backup/"$load"/"$target"/*" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo "rm -rf $rootfs/system/$target/" >> "$bin"/backup/remove-"$(basename "$module")".sh
         else
+          #检测文件
+          [ ! -f "$module"/system/"$target"/.replace ] && continue
           #创建目录
-          mkdir "$dir"/"$target"/
+          mkdir -p "$bin"/backup/system/"$target"/ 2>/dev/null
+          #复制文件
+          cp -a "$rootfs"/system/"$target"/* "$bin"/backup/system/"$target"
+          #清空目录
+          rm -rf "$rootfs"/system/"$target"/*
           #修改文件
-          echo "rm -rf $dir/$target/" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo -e "cp -a $bin/backup/system/$target/* $rootfs/system/$target/\nrm -rf $bin/backup/system/$target/*" >> "$bin"/backup/remove-"$(basename "$module")".sh
         fi
       fi
       #删除变量
       unset target
+      unset config
     done
+    #修改文件
+    echo "$module" >> "$list"
     #删除变量
     unset load
     unset dir
@@ -316,42 +265,25 @@ elif [ "$@" = --post-fs-data ]; then
     setprop ctl.start zygote
     setprop ctl.start zygote_secondary
   fi
-elif [ "$@" = --service ]; then
-  #执行文件
-  for scripts in /data/adb/service.d/*; do
-    #执行文件
-    PATH=/sbin/.magisk/busybox:"$PATH" sh "$scripts" > /dev/null 2>&1 &
-  done
-  for module in /data/adb/modules/*; do
-    #检测状态
-    [ -f "$module"/disable ] && continue
-    #执行文件
-    PATH=/sbin/.magisk/busybox:"$PATH" sh "$module"/service.sh > /dev/null 2>&1 &
-  done
-fi
-exit 0
+} &
 EOF
 
-  set_perm "$NVBASE"/load-module/load-modules.sh 0 0 0755
+  touch "$NVBASE"/load-module/config/load-list 2>/dev/null
+
+  set_perm "$NVBASE"/post-fs-data.d/load-modules.sh 0 0 0755
 
   [ "$API" = 28 ] && TRIGGER=nonencrypted || TRIGGER=boot
 
-  cat << EOF > /system/etc/init/magisk.rc
+  cat << EOF > "$ROOTFS"/system/etc/init/magisk.rc
 on post-fs-data
     start logd
     exec u:r:magisk:s0 0 0 -- /sbin/magisk --post-fs-data
-    #加载模块
-    exec u:r:magisk:s0 0 0 -- /system/bin/sh /data/adb/load-module/load-modules.sh --post-fs-data
 
 on property:vold.decrypt=trigger_restart_framework
     exec u:r:magisk:s0 0 0 -- /sbin/magisk --service
-    #执行文件
-    exec u:r:magisk:s0 0 0 -- /system/bin/sh /data/adb/load-module/load-modules.sh --service
 
 on $TRIGGER
     exec u:r:magisk:s0 0 0 -- /sbin/magisk --service
-    #执行文件
-    exec u:r:magisk:s0 0 0 -- /system/bin/sh /data/adb/load-module/load-modules.sh --service
 
 on property:sys.boot_completed=1
     exec u:r:magisk:s0 0 0 -- /sbin/magisk --boot-complete
@@ -360,11 +292,11 @@ on property:init.svc.zygote=stopped
     exec u:r:magisk:s0 0 0 -- /sbin/magisk --zygote-restart
 EOF
 
-  set_perm /system/etc/init/magisk.rc 0 0 0644
+  set_perm "$ROOTFS"/system/etc/init/magisk.rc 0 0 0644
 
   ui_print "- Launch Magisk Daemon"
   cd /
-  export MAGISKTMP
+  export MAGISKTMP=/sbin
 
   "$MAGISKTMP"/magisk --post-fs-data
   "$MAGISKTMP"/magisk --service
@@ -394,12 +326,12 @@ run_uninstaller() {
 
   ui_print "- Removing Magisk files"
   rm -rf \
-  /sbin/*magisk* /sbin/su* /sbin/resetprop /sbin/kauditd \
-  /sbin/.magisk /cache/*magisk* /cache/unblock /data/*magisk* \
-  /data/cache/*magisk* /data/property/*magisk* /data/Magisk.apk /data/busybox \
-  /data/custom_ramdisk_patch.sh "$NVBASE"/*magisk* "$NVBASE"/load-module "$NVBASE"/post-fs-data.d \
-  "$NVBASE"/service.d "$NVBASE"/modules* /data/unencrypted/magisk /metadata/magisk \
-  /persist/magisk /mnt/vendor/persist/magisk /system/etc/init/magisk.rc /system/etc/init/kauditd.rc
+  "$ROOTFS"/sbin/*magisk* "$ROOTFS"/sbin/su* "$ROOTFS"/sbin/resetprop "$ROOTFS"/sbin/kauditd \
+  "$ROOTFS"/sbin/.magisk "$ROOTFS"/cache/*magisk* "$ROOTFS"/cache/unblock "$ROOTFS"/data/*magisk* \
+  "$ROOTFS"/data/cache/*magisk* "$ROOTFS"/data/property/*magisk* "$ROOTFS"/data/Magisk.apk "$ROOTFS"/data/busybox \
+  "$ROOTFS"/data/custom_ramdisk_patch.sh "$NVBASE"/*magisk* "$NVBASE"/load-module "$NVBASE"/post-fs-data.d \
+  "$NVBASE"/service.d "$NVBASE"/modules* "$ROOTFS"/data/unencrypted/magisk "$ROOTFS"/metadata/magisk \
+  "$ROOTFS"/persist/magisk "$ROOTFS"/mnt/vendor/persist/magisk "$ROOTFS"/system/etc/init/magisk.rc "$ROOTFS"/system/etc/init/kauditd.rc
 
   ui_print "- Done"
 }
@@ -416,8 +348,9 @@ restore_system() {
 
   # Remove Magisk files
   rm -rf \
-  /sbin/*magisk* /sbin/su* /sbin/resetprop /sbin/kauditd \
-  /sbin/.magisk "$NVBASE"/load-module/backup/* /system/etc/init/magisk.rc /system/etc/init/kauditd.rc
+  "$ROOTFS"/sbin/*magisk* "$ROOTFS"/sbin/su* "$ROOTFS"/sbin/resetprop "$ROOTFS"/sbin/kauditd \
+  "$ROOTFS"/sbin/.magisk "$NVBASE"/load-module/backup/* "$NVBASE"/data/adb/load-module/config/load-list "$ROOTFS"/system/etc/init/magisk.rc \
+  "$ROOTFS"/system/etc/init/kauditd.rc
 }
 
 post_ota() {
