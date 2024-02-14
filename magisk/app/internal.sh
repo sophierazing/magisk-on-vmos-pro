@@ -315,23 +315,17 @@ run_uninstaller() {
   print_title "Magisk $PRETTY_VER Uninstaller"
 
   ui_print "- Removing modules"
-  for module in "$NVBASE"/modules/*; do
-    dir="$(echo "$module" | sed "s/modules/modules_update/")"
-
-    [ ! -d "$dir" ] && dir="$module"
-
-    sh "$dir"/uninstall.sh > /dev/null 2>&1
-    sh "$NVBASE"/load-module/backup/remove-"$(basename "$module")".sh > /dev/null 2>&1
-  done
+  magisk --remove-modules -n
 
   ui_print "- Removing Magisk files"
   rm -rf \
-  "$ROOTFS"/sbin/*magisk* "$ROOTFS"/sbin/su* "$ROOTFS"/sbin/resetprop "$ROOTFS"/sbin/kauditd \
-  "$ROOTFS"/sbin/.magisk "$ROOTFS"/cache/*magisk* "$ROOTFS"/cache/unblock "$ROOTFS"/data/*magisk* \
-  "$ROOTFS"/data/cache/*magisk* "$ROOTFS"/data/property/*magisk* "$ROOTFS"/data/Magisk.apk "$ROOTFS"/data/busybox \
-  "$ROOTFS"/data/custom_ramdisk_patch.sh "$NVBASE"/*magisk* "$NVBASE"/load-module "$NVBASE"/post-fs-data.d \
-  "$NVBASE"/service.d "$NVBASE"/modules* "$ROOTFS"/data/unencrypted/magisk "$ROOTFS"/metadata/magisk \
-  "$ROOTFS"/persist/magisk "$ROOTFS"/mnt/vendor/persist/magisk "$ROOTFS"/system/etc/init/magisk.rc "$ROOTFS"/system/etc/init/kauditd.rc
+  "$ROOTFS"/cache/*magisk* "$ROOTFS"/cache/unblock "$ROOTFS"/data/*magisk* "$ROOTFS"/data/cache/*magisk* \
+  "$ROOTFS"/data/property/*magisk* "$ROOTFS"/data/Magisk.apk "$ROOTFS"/data/busybox "$ROOTFS"/data/custom_ramdisk_patch.sh \
+  "$NVBASE"/*magisk* "$NVBASE"/load-module "$NVBASE"/post-fs-data.d "$NVBASE"/service.d \
+  "$NVBASE"/modules* "$ROOTFS"/data/unencrypted/magisk "$ROOTFS"/metadata/magisk "$ROOTFS"/persist/magisk \
+  "$ROOTFS"/mnt/vendor/persist/magisk
+
+  restore_system
 
   ui_print "- Done"
 }
