@@ -181,7 +181,7 @@ done
   #等待加载
   while [ -z "$(cat "$rootfs"/cache/magisk.log | grep "* Loading modules")" ]; do sleep 0.0; done
   #加载模块
-  for module in "$rootfs"/data/adb/modules/*; do
+  for module in $(ls "$rootfs"/data/adb/modules/); do
     #检测状态
     [ -f "$module"/disable ] && continue
     #修改属性
@@ -332,7 +332,7 @@ run_uninstaller() {
 
 restore_system() {
   # Remove modules load files
-  for module in "$NVBASE"/modules/*; do
+  for module in $(ls "$NVBASE"/modules/); do
     dir="$(echo "$module" | sed "s/modules/modules_update/")"
 
     [ ! -d "$dir" ] && dir="$module"
