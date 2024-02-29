@@ -157,8 +157,10 @@ list="$bin"/config/load-list
 sed -i "/^$/d" "$list"
 #恢复更改
 for module in $(cat "$list"); do
+  #模块路径
+  path="$rootfs"/data/adb/modules/"$module"
   #检测状态
-  [ -d "$module"/ -a ! -f "$module"/update -a ! -f "$module"/skip_mount -a ! -f "$module"/disable -a ! -f "$module"/remove ] && continue
+  [ -d "$path"/ -a ! -f "$path"/update -a ! -f "$path"/skip_mount -a ! -f "$path"/disable -a ! -f "$path"/remove ] && continue
   #重启服务
   if [ -z "$restart" ]; then
     #停止服务
@@ -168,13 +170,15 @@ for module in $(cat "$list"); do
     restart=true
   fi
   #执行文件
-  sh "$bin"/backup/remove-"$(basename "$module")".sh > /dev/null 2>&1
+  sh "$bin"/backup/remove-"$module".sh > /dev/null 2>&1
   #删除文件
-  rm -f "$bin"/backup/remove-"$(basename "$module")".sh
+  rm -f "$bin"/backup/remove-"$module".sh
   #删除配置
-  [ -f "$module"/remove ] && rm -f "$bin"/config/load-"$(basename "$module")"-list
+  [ -f "$path"/remove ] && rm -f "$bin"/config/load-"$module"-list
   #修改文件
-  sed -i "s|$module||" "$list"
+  sed -i "s/$module//" "$list"
+  #删除变量
+  unset path
 done
 #并行运行
 {
@@ -182,14 +186,16 @@ done
   while [ -z "$(cat "$rootfs"/cache/magisk.log | grep "* Loading modules")" ]; do sleep 0.0; done
   #加载模块
   for module in $(ls "$rootfs"/data/adb/modules/); do
+    #模块路径
+    path="$rootfs"/data/adb/modules/"$module"
     #检测状态
-    [ -f "$module"/disable ] && continue
+    [ -f "$path"/disable ] && continue
     #修改属性
-    for prop in $(cat "$module"/system.prop 2>/dev/null); do
+    for prop in $(cat "$path"/system.prop 2>/dev/null); do
       echo "$prop" | sed "s/=/ /" | xargs setprop 2>/dev/null
     done
     #检测状态
-    [ "$(cat "$list" | grep "$module")" -o -f "$module"/skip_mount -o ! -d "$module"/system/ -o ! -f "$bin"/config/load-"$(basename "$module")"-list ] && continue
+    [ "$(cat "$list" | grep "$module")" -o -f "$path"/skip_mount -o ! -d "$path"/system/ -o ! -f "$bin"/config/load-"$module"-list ] && continue
     #重启服务
     if [ -z "$restart" ]; then
       #停止服务
@@ -199,15 +205,15 @@ done
       restart=true
     fi
     #切换目录
-    cd "$module"/system
+    cd "$path"/system
     #加载文件
     for file in $(find); do
       #目标文件
       target="$(echo "$file" | sed "s/..//")"
       #加载配置
-      config="$(cat "$bin"/config/load-"$(basename "$module")"-list | grep "$rootfs/system/$target=" | sed "s/=/ /" | awk '{print $2}')"
+      config="$(cat "$bin"/config/load-"$module"-list | grep "$rootfs/system/$target=" | sed "s/=/ /" | awk '{print $2}')"
       #检查类型
-      if [ -f "$module"/system/"$target" ]; then
+      if [ -f "$path"/system/"$target" ]; then
         #检测文件
         [ "$(basename "$target")" = .replace ] && continue 
         #备份文件
@@ -219,26 +225,26 @@ done
           #复制文件
           mv "$rootfs"/system/"$target" "$bin"/backup/system/"$target" || continue
           #修改文件
-          echo "mv -f $bin/backup/system/$target $rootfs/system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo "mv -f $bin/backup/system/$target $rootfs/system/$target" >> "$bin"/backup/remove-"$module".sh
         elif [ "$config" = remove ]; then
           #修改文件
-          echo "rm -f $rootfs/system/$target" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo "rm -f $rootfs/system/$target" >> "$bin"/backup/remove-"$module".sh
         else
           #跳过加载
           continue
         fi
         #复制文件
-        cp -af "$module"/system/"$target" "$rootfs"/system/"$target"
-      elif [ -d "$module"/system/"$target" ]; then
+        cp -af "$path"/system/"$target" "$rootfs"/system/"$target"
+      elif [ -d "$path"/system/"$target" ]; then
         #检查目录
         if [ "$config" = remove ]; then
           #创建目录
           mkdir "$rootfs"/system/"$target"/
           #修改文件
-          echo "rm -rf $rootfs/system/$target/" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo "rm -rf $rootfs/system/$target/" >> "$bin"/backup/remove-"$module".sh
         else
           #检测文件
-          [ ! -f "$module"/system/"$target"/.replace ] && continue
+          [ ! -f "$path"/system/"$target"/.replace ] && continue
           #创建目录
           mkdir -p "$bin"/backup/system/"$target"/ 2>/dev/null
           #复制文件
@@ -246,7 +252,7 @@ done
           #清空目录
           rm -rf "$rootfs"/system/"$target"/*
           #修改文件
-          echo -e "cp -a $bin/backup/system/$target/* $rootfs/system/$target/\nrm -rf $bin/backup/system/$target/*" >> "$bin"/backup/remove-"$(basename "$module")".sh
+          echo -e "cp -a $bin/backup/system/$target/* $rootfs/system/$target/\nrm -rf $bin/backup/system/$target/*" >> "$bin"/backup/remove-"$module".sh
         fi
       fi
       #删除变量
@@ -256,8 +262,7 @@ done
     #修改文件
     echo "$module" >> "$list"
     #删除变量
-    unset load
-    unset dir
+    unset path
   done
   #重启服务
   if [ "$restart" ]; then
@@ -316,11 +321,11 @@ run_uninstaller() {
 
   ui_print "- Removing modules"
   for module in $(ls "$NVBASE"/modules/); do
-    dir="$(echo "$module" | sed "s/modules/modules_update/")"
+    path="$NVBASE"/modules_update/"$module"
 
-    [ ! -d "$dir" ] && dir="$module"
+    [ ! -d "$path"/ ] && path="$NVBASE"/modules/"$module"
 
-    sh "$dir"/uninstall.sh > /dev/null 2>&1
+    sh "$path"/uninstall.sh > /dev/null 2>&1
   done
 
   ui_print "- Removing Magisk files"
@@ -339,11 +344,7 @@ run_uninstaller() {
 restore_system() {
   # Remove modules load files
   for module in $(ls "$NVBASE"/modules/); do
-    dir="$(echo "$module" | sed "s/modules/modules_update/")"
-
-    [ ! -d "$dir" ] && dir="$module"
-
-    sh "$NVBASE"/load-module/backup/remove-"$(basename "$module")".sh > /dev/null 2>&1
+    sh "$NVBASE"/load-module/backup/remove-"$module".sh > /dev/null 2>&1
   done
 
   # Remove Magisk files
