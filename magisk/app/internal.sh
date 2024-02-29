@@ -315,7 +315,13 @@ run_uninstaller() {
   print_title "Magisk $PRETTY_VER Uninstaller"
 
   ui_print "- Removing modules"
-  magisk --remove-modules -n
+  for module in $(ls "$NVBASE"/modules/); do
+    dir="$(echo "$module" | sed "s/modules/modules_update/")"
+
+    [ ! -d "$dir" ] && dir="$module"
+
+    sh "$dir"/uninstall.sh > /dev/null 2>&1
+  done
 
   ui_print "- Removing Magisk files"
   rm -rf \
