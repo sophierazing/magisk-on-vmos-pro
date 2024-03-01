@@ -347,11 +347,14 @@ restore_system() {
     sh "$NVBASE"/load-module/backup/remove-"$module".sh > /dev/null 2>&1
   done
 
+  echo "" > "$NVBASE"/load-module/config/load-list 2>/dev/null
+
   # Remove Magisk files
   rm -rf \
   "$ROOTFS"/sbin/*magisk* "$ROOTFS"/sbin/su* "$ROOTFS"/sbin/resetprop "$ROOTFS"/sbin/kauditd \
-  "$ROOTFS"/sbin/.magisk "$NVBASE"/load-module/backup/* "$NVBASE"/data/adb/load-module/config/load-list "$ROOTFS"/system/etc/init/magisk.rc \
-  "$ROOTFS"/system/etc/init/kauditd.rc
+  "$ROOTFS"/sbin/.magisk "$NVBASE"/load-module/backup/* "$ROOTFS"/system/etc/init/magisk.rc "$ROOTFS"/system/etc/init/kauditd.rc
+
+  return 0
 }
 
 post_ota() {
