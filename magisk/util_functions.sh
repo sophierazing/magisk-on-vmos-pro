@@ -2,6 +2,9 @@
 # Magisk General Utility Functions
 ############################################
 
+# Magisk On VMOS Pro
+# Powered by Magisk On System
+
 MAGISK_VER='27.0'
 MAGISK_VER_CODE=27000
 
